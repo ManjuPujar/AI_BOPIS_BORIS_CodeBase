@@ -240,29 +240,53 @@ const ProductPage = () => {
             </div>
 
             {/* Fulfillment */}
-            <div style={styles.fulfillmentSection}>
-              <div
-                style={{ ...styles.fulfillmentOption, ...(fulfillment === 'pickup' ? styles.fulfillmentActive : {}) }}
-                onClick={() => setFulfillment('pickup')}
-              >
-                <FiShoppingBag size={20} />
-                <div>
-                  <strong>Pick Up In Store</strong>
-                  <span style={styles.fulfillmentSub}>Free - Ready in 2 hours</span>
-                </div>
-                {fulfillment === 'pickup' && <FiCheck size={18} color="#22c55e" />}
-              </div>
-              <div
-                style={{ ...styles.fulfillmentOption, ...(fulfillment === 'ship' ? styles.fulfillmentActive : {}) }}
-                onClick={() => setFulfillment('ship')}
-              >
-                <FiTruck size={20} />
-                <div>
-                  <strong>Ship to Me</strong>
-                  <span style={styles.fulfillmentSub}>Free over $75 - 3-5 business days</span>
-                </div>
-                {fulfillment === 'ship' && <FiCheck size={18} color="#22c55e" />}
-              </div>
+            <div style={styles.fulfillmentSection} role="radiogroup" aria-label="Delivery method">
+              {[
+                { key: 'pickup', icon: FiShoppingBag, title: 'Pick Up In Store', sub: 'Free - Ready in 2 hours' },
+                { key: 'ship', icon: FiTruck, title: 'Ship to Me', sub: 'Free over $75 - 3-5 business days' },
+              ].map((opt) => {
+                const isSelected = fulfillment === opt.key;
+                const OptIcon = opt.icon;
+                return (
+                  <div
+                    key={opt.key}
+                    role="radio"
+                    aria-checked={isSelected}
+                    aria-label={`${opt.title} — ${opt.sub}`}
+                    tabIndex={0}
+                    onClick={() => setFulfillment(opt.key)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFulfillment(opt.key); } }}
+                    style={{
+                      ...styles.fulfillmentOption,
+                      border: isSelected ? '2px solid #10b981' : '1px solid rgba(255,255,255,0.06)',
+                      backgroundColor: isSelected ? 'rgba(16,185,129,0.06)' : '#1b1b1f',
+                      padding: isSelected ? '13px 15px' : '14px 16px',
+                      boxShadow: isSelected ? '0 0 0 1px rgba(16,185,129,0.15), 0 4px 16px rgba(16,185,129,0.08)' : 'none',
+                    }}
+                  >
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: isSelected ? '#10b981' : 'rgba(255,255,255,0.04)',
+                      border: isSelected ? 'none' : '2px solid rgba(255,255,255,0.1)',
+                      transition: 'all 200ms ease',
+                    }}>
+                      {isSelected
+                        ? <FiCheck size={18} color="#fff" strokeWidth={3} />
+                        : <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                      }
+                    </div>
+                    <OptIcon size={20} color={isSelected ? '#10b981' : '#5C5C60'} />
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ color: isSelected ? '#E8E8E8' : '#8E8E92' }}>{opt.title}</strong>
+                      <span style={{ ...styles.fulfillmentSub, color: isSelected ? '#8E8E92' : '#3E3E42' }}>{opt.sub}</span>
+                    </div>
+                    {isSelected && (
+                      <span style={styles.fulfillmentBadge}>Selected</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Store Search for Pickup */}
@@ -480,10 +504,10 @@ const styles = {
   qtyWrap: { display: 'flex', alignItems: 'center', gap: 0, border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, width: 'fit-content' },
   qtyBtn: { width: 40, height: 40, border: 'none', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E8E8E8' },
   qtyVal: { width: 40, textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#E8E8E8' },
-  fulfillmentSection: { display: 'flex', flexDirection: 'column', gap: 8 },
-  fulfillmentOption: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, cursor: 'pointer', transition: 'border-color 220ms ease', fontSize: 14, color: '#E8E8E8', backgroundColor: '#1b1b1f' },
-  fulfillmentActive: { borderColor: 'rgba(255,255,255,0.14)', backgroundColor: '#1e1e22' },
-  fulfillmentSub: { display: 'block', fontSize: 12, color: '#5C5C60', marginTop: 2 },
+  fulfillmentSection: { display: 'flex', flexDirection: 'column', gap: 10 },
+  fulfillmentOption: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 10, cursor: 'pointer', transition: 'all 200ms ease', fontSize: 14, color: '#E8E8E8', outline: 'none' },
+  fulfillmentSub: { display: 'block', fontSize: 12, marginTop: 2 },
+  fulfillmentBadge: { fontSize: 10, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: 0.8, flexShrink: 0, padding: '3px 8px', backgroundColor: 'rgba(16,185,129,0.12)', borderRadius: 5 },
   storeSearch: { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, backgroundColor: '#1b1b1f', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' },
   zipRow: { display: 'flex', gap: 8 },
   zipInput: { flex: 1, padding: '10px 14px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: 14, outline: 'none', backgroundColor: '#19191d', color: '#E8E8E8' },
