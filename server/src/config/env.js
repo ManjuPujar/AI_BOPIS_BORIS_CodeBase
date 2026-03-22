@@ -4,8 +4,8 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const config = {
   PORT: process.env.PORT || 5000,
   MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/converse_bopis',
-  CUSTOMER_JWT_SECRET: process.env.CUSTOMER_JWT_SECRET,
-  STORE_JWT_SECRET: process.env.STORE_JWT_SECRET,
+  CUSTOMER_JWT_SECRET: process.env.CUSTOMER_JWT_SECRET || 'converse-customer-dev-secret-key-2024',
+  STORE_JWT_SECRET: process.env.STORE_JWT_SECRET || 'converse-store-dev-secret-key-2024',
   CUSTOMER_JWT_EXPIRES_IN: process.env.CUSTOMER_JWT_EXPIRES_IN || '7d',
   STORE_JWT_EXPIRES_IN: process.env.STORE_JWT_EXPIRES_IN || '8h',
   EMAIL_HOST: process.env.EMAIL_HOST,

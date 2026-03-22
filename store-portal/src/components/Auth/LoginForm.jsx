@@ -85,6 +85,17 @@ const styles = {
   },
 };
 
+function getLoginErrorMessage(err) {
+  if (!err.response) {
+    return 'Unable to connect to the server. Please check your connection and try again.';
+  }
+  const msg = err.response.data?.message;
+  if (err.response.status === 400 && msg) return msg;
+  if (err.response.status === 429) return 'Too many login attempts. Please wait a moment and try again.';
+  if (err.response.status >= 500) return 'Something went wrong on our end. Please try again later.';
+  return msg || 'Invalid email or password. Please try again.';
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -96,6 +107,14 @@ export default function LoginForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -103,7 +122,8 @@ export default function LoginForm() {
       toast.success('Welcome back!');
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      const message = getLoginErrorMessage(err);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -131,7 +151,7 @@ export default function LoginForm() {
             style={styles.input}
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); setError(''); }}
             placeholder="employee@converse.com"
             required
             autoFocus
@@ -144,7 +164,7 @@ export default function LoginForm() {
             style={styles.input}
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); setError(''); }}
             placeholder="Enter your password"
             required
           />

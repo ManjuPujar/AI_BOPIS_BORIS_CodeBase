@@ -38,19 +38,43 @@ const errorHandler = (err, req, res, next) => {
     return res.status(401).json({ message: 'Token has expired' });
   }
 
-  const knownErrors = [
+  const authErrors = [
     'Invalid email or password',
+    'Current password is incorrect',
+    'Invalid or expired reset token',
+    'Invalid or expired refresh token',
+    'Refresh token has been revoked',
+    'No account found with that email',
+  ];
+  const conflictErrors = [
     'A customer with this email already exists',
+  ];
+  const notFoundErrors = [
     'Order not found',
+    'Customer not found',
+    'Store user not found',
+    'Address not found',
+  ];
+  const badRequestErrors = [
     'Authentication required',
     'Unauthorized access to order',
     'Email is required for guest checkout',
+    'Refresh token is required',
   ];
-  const isKnown = knownErrors.some((msg) => err.message?.includes(msg)) || err.message?.startsWith('Cannot ') || err.message?.startsWith('Insufficient ');
-  const statusCode = err.statusCode || (isKnown ? 400 : 500);
+
+  let statusCode = err.statusCode;
+  if (!statusCode) {
+    const msg = err.message || '';
+    if (authErrors.some((e) => msg.includes(e))) statusCode = 400;
+    else if (conflictErrors.some((e) => msg.includes(e))) statusCode = 409;
+    else if (notFoundErrors.some((e) => msg.includes(e))) statusCode = 404;
+    else if (badRequestErrors.some((e) => msg.includes(e)) || msg.startsWith('Cannot ') || msg.startsWith('Insufficient ')) statusCode = 400;
+    else statusCode = 500;
+  }
+
   res.status(statusCode).json({
-    message: err.message || 'Internal Server Error',
-    ...(config.NODE_ENV === 'development' && { stack: err.stack }),
+    message: statusCode >= 500 ? 'Internal server error. Please try again later.' : (err.message || 'Something went wrong'),
+    ...(config.NODE_ENV === 'development' && statusCode >= 500 && { detail: err.message, stack: err.stack }),
   });
 };
 

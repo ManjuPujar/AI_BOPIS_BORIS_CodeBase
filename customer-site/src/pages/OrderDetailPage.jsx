@@ -1,11 +1,78 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FiArrowLeft, FiMapPin, FiTruck, FiPackage, FiCheck, FiX, FiClock, FiShield } from 'react-icons/fi';
+import { FiArrowLeft, FiMapPin, FiTruck, FiPackage, FiCheck, FiX, FiClock, FiShield, FiCheckCircle, FiAlertTriangle, FiXCircle, FiInfo } from 'react-icons/fi';
 import useOrderStatus from '../hooks/useOrderStatus';
 import useAuth from '../hooks/useAuth';
 import * as orderService from '../services/orderService';
 import { formatCurrency } from '../utils/formatCurrency';
+
+const BOPIS_STATUS_MESSAGES = {
+  AWAITING_STORE_ACCEPTANCE: {
+    icon: FiClock,
+    color: '#fbbf24',
+    bg: 'rgba(251,191,36,0.06)',
+    border: 'rgba(251,191,36,0.12)',
+    title: 'Awaiting Store Confirmation',
+    message: 'Your order is currently pending and will only be confirmed once the store manager reviews and accepts it based on current stock availability. The pickup date and time will be provided after acceptance.',
+  },
+  ACCEPTED: {
+    icon: FiCheck,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Order Accepted by Store',
+    message: 'The store has accepted your order and is now preparing it for pickup. You will be notified once your items are ready to collect.',
+  },
+  READY_FOR_PICKUP: {
+    icon: FiMapPin,
+    color: '#c4b5fd',
+    bg: 'rgba(196,181,253,0.06)',
+    border: 'rgba(196,181,253,0.12)',
+    title: 'Ready for Pickup',
+    message: 'Your order is ready! Head to the store with your order number and the pickup verification code. A store associate will verify your code and hand over your items.',
+  },
+  OTP_VERIFIED: {
+    icon: FiShield,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Pickup Code Verified',
+    message: 'Your pickup verification code has been confirmed at the store. Please collect your items from the store associate.',
+  },
+  PICKED_UP: {
+    icon: FiPackage,
+    color: '#60a5fa',
+    bg: 'rgba(96,165,250,0.06)',
+    border: 'rgba(96,165,250,0.12)',
+    title: 'Order Picked Up',
+    message: 'You have successfully collected your order. If you need to return any items, you can initiate a return from this page.',
+  },
+  COMPLETED: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Order Complete',
+    message: 'Your order is complete. Thank you for shopping with Converse! Returns can be initiated within 30 days.',
+  },
+  REJECTED: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Order Could Not Be Fulfilled',
+    message: 'The store was unable to fulfill your order due to stock unavailability. You will not be charged. Please try placing a new order or selecting a different store.',
+  },
+  CANCELLED: {
+    icon: FiAlertTriangle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Order Cancelled',
+    message: 'This order has been cancelled. If you were charged, a refund will be processed within 5–7 business days.',
+  },
+};
 
 const BOPIS_STEPS = [
   { key: 'AWAITING_STORE_ACCEPTANCE', label: 'Order Placed', icon: FiPackage },
@@ -193,6 +260,20 @@ const OrderDetailPage = () => {
             })}
           </div>
         )}
+
+        {/* Dynamic BOPIS Status Message */}
+        {isPickup && BOPIS_STATUS_MESSAGES[order.status] && !['CANCELLED', 'REJECTED'].includes(order.status) && (() => {
+          const statusMsg = BOPIS_STATUS_MESSAGES[order.status];
+          const StatusIcon = statusMsg.icon;
+          return (
+            <div style={{ ...styles.statusMsgBox, backgroundColor: statusMsg.bg, borderColor: statusMsg.border, color: statusMsg.color }}>
+              <StatusIcon size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+              <p style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>
+                <strong>{statusMsg.title}:</strong> {statusMsg.message}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Pickup OTP Section */}
         {otpData?.hasOtp && otpData.pickupOtp && order.status === 'READY_FOR_PICKUP' && (
@@ -401,6 +482,7 @@ const styles = {
   stepNum: { fontSize: 12, fontWeight: 600, color: '#5C5C60' },
   stepLine: { position: 'absolute', top: 16, left: '50%', width: '100%', height: 3, zIndex: 0, borderRadius: 2 },
   stepLabel: { fontSize: 11, textAlign: 'center', maxWidth: 90, lineHeight: 1.3, color: '#8E8E92' },
+  statusMsgBox: { display: 'flex', gap: 12, padding: '16px 20px', borderRadius: 12, marginBottom: 24, alignItems: 'flex-start', border: '1px solid' },
   cancelledBanner: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 20px', backgroundColor: 'rgba(248,113,113,0.08)', color: '#f87171', borderRadius: 8, fontSize: 14, fontWeight: 600, marginBottom: 32 },
   timelineCard: { backgroundColor: '#1b1b1f', borderRadius: 12, padding: 24, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 24, boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)' },
   timeline: { position: 'relative', paddingLeft: 4 },

@@ -4,6 +4,18 @@ import { toast } from 'react-toastify';
 import useAuth from '../hooks/useAuth';
 import { validateEmail, validatePassword } from '../utils/validators';
 
+function getRegisterErrorMessage(err) {
+  if (!err.response) {
+    return 'Unable to connect to the server. Please check your connection and try again.';
+  }
+  const msg = err.response.data?.message;
+  if (err.response.status === 409 && msg) return msg;
+  if (err.response.status === 400 && msg) return msg;
+  if (err.response.status === 429) return 'Too many attempts. Please wait a moment and try again.';
+  if (err.response.status >= 500) return 'Something went wrong on our end. Please try again later.';
+  return msg || 'Registration failed. Please try again.';
+}
+
 const RegisterPage = () => {
   const [form, setForm] = useState({
     firstName: '',
@@ -12,30 +24,33 @@ const RegisterPage = () => {
     password: '',
     confirmPassword: '',
   });
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.firstName || !form.lastName) {
-      toast.error('Please enter your full name');
+    setError('');
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setError('Please enter your first and last name.');
       return;
     }
     if (!validateEmail(form.email)) {
-      toast.error('Please enter a valid email');
+      setError('Please enter a valid email address.');
       return;
     }
     if (!validatePassword(form.password)) {
-      toast.error('Password must be at least 8 characters with 1 uppercase letter and 1 number');
+      setError('Password must be at least 8 characters with 1 uppercase letter and 1 number.');
       return;
     }
     if (form.password !== form.confirmPassword) {
-      toast.error('Passwords do not match');
+      setError('Passwords do not match.');
       return;
     }
     setLoading(true);
@@ -49,7 +64,7 @@ const RegisterPage = () => {
       toast.success('Account created successfully!');
       navigate('/');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed');
+      setError(getRegisterErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -62,6 +77,7 @@ const RegisterPage = () => {
           <h1 style={styles.title}>Create Account</h1>
           <p style={styles.subtitle}>Join the Converse community</p>
         </div>
+        {error && <div style={styles.errorBox}>{error}</div>}
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.row}>
             <div style={styles.field}>
@@ -139,6 +155,7 @@ const RegisterPage = () => {
 const styles = {
   page: { minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', backgroundColor: 'transparent' },
   card: { width: '100%', maxWidth: 500, backgroundColor: '#1b1b1f', borderRadius: 12, padding: '40px 36px', boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)', border: '1px solid rgba(255,255,255,0.05)' },
+  errorBox: { color: '#f87171', fontSize: 13, textAlign: 'center', padding: '10px 14px', marginBottom: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: 6, lineHeight: 1.4 },
   header: { textAlign: 'center', marginBottom: 32 },
   title: { fontSize: 28, fontWeight: 800, marginBottom: 8, color: '#E8E8E8' },
   subtitle: { fontSize: 15, color: '#5C5C60' },

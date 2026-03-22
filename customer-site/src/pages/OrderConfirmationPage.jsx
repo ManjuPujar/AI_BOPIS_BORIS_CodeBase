@@ -1,10 +1,77 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { FiCheckCircle, FiMapPin, FiTruck, FiArrowRight, FiPackage, FiCheck, FiClock, FiShoppingBag, FiInfo, FiShield } from 'react-icons/fi';
+import { FiCheckCircle, FiMapPin, FiTruck, FiArrowRight, FiPackage, FiCheck, FiClock, FiShoppingBag, FiInfo, FiShield, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
 import useOrderStatus from '../hooks/useOrderStatus';
 import useAuth from '../hooks/useAuth';
 import * as orderService from '../services/orderService';
 import { formatCurrency } from '../utils/formatCurrency';
+
+const BOPIS_STATUS_MESSAGES = {
+  AWAITING_STORE_ACCEPTANCE: {
+    icon: FiClock,
+    color: '#fbbf24',
+    bg: 'rgba(251,191,36,0.06)',
+    border: 'rgba(251,191,36,0.12)',
+    title: 'Awaiting Store Confirmation',
+    message: 'Your order is currently pending and will only be confirmed once the store manager reviews and accepts it based on current stock availability. The pickup date and time will be provided by the store after acceptance. If the store is unable to fulfill your order, you will be notified promptly.',
+  },
+  ACCEPTED: {
+    icon: FiCheck,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Order Accepted by Store',
+    message: 'Great news! The store has accepted your order and is now preparing it for pickup. You will receive a notification once your items are packed and ready to collect.',
+  },
+  READY_FOR_PICKUP: {
+    icon: FiMapPin,
+    color: '#c4b5fd',
+    bg: 'rgba(196,181,253,0.06)',
+    border: 'rgba(196,181,253,0.12)',
+    title: 'Ready for Pickup',
+    message: 'Your order is ready! Head to the store with your order number and the pickup verification code shown below. A store associate will verify your code and hand over your items.',
+  },
+  OTP_VERIFIED: {
+    icon: FiShield,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Pickup Code Verified',
+    message: 'Your pickup verification code has been confirmed at the store. Please collect your items from the store associate.',
+  },
+  PICKED_UP: {
+    icon: FiPackage,
+    color: '#60a5fa',
+    bg: 'rgba(96,165,250,0.06)',
+    border: 'rgba(96,165,250,0.12)',
+    title: 'Order Picked Up',
+    message: 'You have successfully collected your order. Enjoy your purchase! If you need to return any items, you can initiate a return from your order history.',
+  },
+  COMPLETED: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Order Complete',
+    message: 'Your order is complete. Thank you for shopping with Converse! If you need to return any items, you can do so within 30 days from your order history.',
+  },
+  REJECTED: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Order Could Not Be Fulfilled',
+    message: 'Unfortunately, the store was unable to fulfill your order due to stock unavailability. You will not be charged. Please try placing a new order or selecting a different store.',
+  },
+  CANCELLED: {
+    icon: FiAlertTriangle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Order Cancelled',
+    message: 'This order has been cancelled. If you were charged, a refund will be processed within 5–7 business days.',
+  },
+};
 
 const BOPIS_STEPS = [
   { key: 'AWAITING_STORE_ACCEPTANCE', label: 'Order Placed', icon: FiShoppingBag, desc: 'Sent to store for review' },
@@ -87,17 +154,18 @@ const OrderConfirmationPage = () => {
           </p>
         </div>
 
-        {isBOPIS && (
-          <div style={s.disclaimerBox}>
-            <FiInfo size={18} style={{ flexShrink: 0, marginTop: 2 }} />
-            <p style={s.disclaimerText}>
-              <strong>Please note:</strong> Your order is currently pending and will only be confirmed once the
-              store manager reviews and accepts it based on current stock availability. The pickup date and time
-              will be provided by the store after acceptance, depending on staff availability and store capacity.
-              If the store is unable to fulfill your order, you will be notified promptly.
-            </p>
-          </div>
-        )}
+        {isBOPIS && BOPIS_STATUS_MESSAGES[order.status] && (() => {
+          const statusMsg = BOPIS_STATUS_MESSAGES[order.status];
+          const StatusIcon = statusMsg.icon;
+          return (
+            <div style={{ ...s.disclaimerBox, backgroundColor: statusMsg.bg, borderColor: statusMsg.border, color: statusMsg.color }}>
+              <StatusIcon size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+              <p style={s.disclaimerText}>
+                <strong>{statusMsg.title}:</strong> {statusMsg.message}
+              </p>
+            </div>
+          );
+        })()}
 
         {/* Live Status Tracker */}
         <div style={s.trackerCard}>
