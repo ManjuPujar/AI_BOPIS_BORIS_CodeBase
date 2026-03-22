@@ -1,0 +1,29 @@
+const {
+  ORDER_STATUSES,
+  VALID_TRANSITIONS,
+  isValidTransition,
+} = require('../../../shared/orderStatuses');
+
+const { STORE_ROLES, CUSTOMER_ROLE } = require('../../../shared/roles');
+
+const DELIVERY_METHODS = {
+  SHIP_TO_ME: 'SHIP_TO_ME',
+  SHIP_TO_STORE: 'SHIP_TO_STORE',
+};
+
+const RETURN_STATUSES = {
+  RETURN_REQUESTED: 'RETURN_REQUESTED',
+  RETURN_ACCEPTED: 'RETURN_ACCEPTED',
+  RETURN_COMPLETED: 'RETURN_COMPLETED',
+  RETURN_REJECTED: 'RETURN_REJECTED',
+};
+
+module.exports = {
+  ORDER_STATUSES,
+  VALID_TRANSITIONS,
+  isValidTransition,
+  STORE_ROLES,
+  CUSTOMER_ROLE,
+  DELIVERY_METHODS,
+  RETURN_STATUSES,
+};

@@ -1,0 +1,20 @@
+{
+  "name": "converse-bopis-boris",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Converse Ecommerce – Ship to Store (Pickup) & Return to Store",
+  "scripts": {
+    "start:customer": "cd customer-site && npm start",
+    "start:store": "cd store-portal && npm start",
+    "start:server": "cd server && npm run seed-start",
+    "start:all": "concurrently \"npm run start:server\" \"npm run start:customer\" \"npm run start:store\"",
+    "install:all": "cd server && npm install && cd ../customer-site && npm install && cd ../store-portal && npm install",
+    "test:customer": "cd customer-site && npm test",
+    "test:store": "cd store-portal && npm test",
+    "test:server": "cd server && npm test",
+    "test:all": "npm run test:server && npm run test:customer && npm run test:store"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
