@@ -36,8 +36,8 @@ export default function Sidebar() {
   const fetchCounts = useCallback(async () => {
     try {
       const [awaitingData, returnData] = await Promise.all([
-        orderService.getOrders('AWAITING_STORE_ACCEPTANCE', 1, 1),
-        orderService.getOrders('RETURN_REQUESTED', 1, 1).catch(() => ({ pagination: { total: 0 } })),
+        orderService.getOrders('AWAITING_STORE_ACCEPTANCE', 1, 1, { allStores: true }),
+        orderService.getOrders('RETURN_REQUESTED', 1, 1, { allStores: true }).catch(() => ({ pagination: { total: 0 } })),
       ]);
       setAwaitingCount(awaitingData.pagination?.total || awaitingData.orders?.length || 0);
       setReturnCount(returnData.pagination?.total || returnData.orders?.length || 0);

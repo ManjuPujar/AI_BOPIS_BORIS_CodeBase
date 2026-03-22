@@ -64,22 +64,27 @@ const ReturnPage = () => {
 
     setSubmitting(true);
     try {
+      const itemReasons = selectedItems.map((idx) => reasons[idx]);
+      const topReason = itemReasons.join('; ');
+
+      const storeId = order.storeId?._id || order.storeId || order.store?._id || order.store;
       const returnData = {
         orderId,
-        items: selectedItems.map((idx) => ({
-          productId: order.items[idx].productId,
-          productName: order.items[idx].productName,
-          sku: order.items[idx].sku,
-          size: order.items[idx].size,
-          color: order.items[idx].color,
-          quantity: order.items[idx].quantity,
-          reason: reasons[idx],
-        })),
+        storeId,
+        reason: topReason,
         notes,
+        items: selectedItems.map((idx) => {
+          const item = order.items[idx];
+          return {
+            orderItemId: item._id || item.id,
+            quantity: item.quantity,
+            reason: reasons[idx],
+          };
+        }),
       };
       await returnService.createReturn(returnData);
       toast.success('Return request submitted successfully!');
-      navigate('/orders');
+      navigate(`/orders/${orderId}`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to submit return');
     } finally {

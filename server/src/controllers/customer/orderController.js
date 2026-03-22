@@ -28,6 +28,10 @@ const createOrder = async (req, res, next) => {
       }
     }
 
+    if (deliveryMethod === 'SHIP_TO_STORE' && !storeId) {
+      return res.status(400).json({ message: 'A pickup store is required for BOPIS orders. Please select a store and try again.' });
+    }
+
     if (!guestInfo && contactInfo) {
       guestInfo = contactInfo;
     }
@@ -47,7 +51,7 @@ const getMyOrders = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
-    const result = await orderService.getCustomerOrders(req.customer._id, page, limit);
+    const result = await orderService.getCustomerOrders(req.customer._id, page, limit, req.customer.email);
     res.status(200).json(result);
   } catch (error) {
     next(error);
@@ -68,7 +72,7 @@ const getOrderById = async (req, res, next) => {
 const cancelOrder = async (req, res, next) => {
   try {
     const { reason } = req.body;
-    const order = await orderService.cancelOrder(req.params.orderId, req.customer._id, reason);
+    const order = await orderService.cancelOrder(req.params.orderId, req.customer._id, reason, req.customer.email);
     res.status(200).json(order);
   } catch (error) {
     next(error);

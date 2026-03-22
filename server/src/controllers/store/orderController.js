@@ -3,7 +3,7 @@ const notificationService = require('../../services/notificationService');
 
 const getStoreOrders = async (req, res, next) => {
   try {
-    const storeId = req.storeUser.storeId;
+    const storeId = req.query.allStores === 'true' ? null : req.storeUser.storeId;
     const status = req.query.status || null;
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 20;
@@ -16,9 +16,10 @@ const getStoreOrders = async (req, res, next) => {
 
 const getOrderById = async (req, res, next) => {
   try {
+    const storeId = req.query.allStores === 'true' ? null : req.storeUser.storeId;
     const order = await orderService.getStoreOrderById(
       req.params.orderId,
-      req.storeUser.storeId
+      storeId
     );
     res.status(200).json(order);
   } catch (error) {
@@ -31,7 +32,7 @@ const acceptOrder = async (req, res, next) => {
     const { pickupReadyTime } = req.body;
     const order = await orderService.acceptOrder(
       req.params.orderId,
-      req.storeUser.storeId,
+      null,
       pickupReadyTime,
       req.storeUser._id
     );
@@ -63,7 +64,7 @@ const rejectOrder = async (req, res, next) => {
     const { reason } = req.body;
     const order = await orderService.rejectOrder(
       req.params.orderId,
-      req.storeUser.storeId,
+      null,
       req.storeUser._id,
       reason
     );
@@ -83,7 +84,7 @@ const verifyOtp = async (req, res, next) => {
     const result = await orderService.verifyPickupOtp(
       req.params.orderId,
       otp,
-      req.storeUser.storeId,
+      null,
       req.storeUser._id
     );
     res.status(200).json(result);
@@ -96,7 +97,7 @@ const regenerateOtp = async (req, res, next) => {
   try {
     const result = await orderService.regeneratePickupOtp(
       req.params.orderId,
-      req.storeUser.storeId,
+      null,
       req.storeUser._id
     );
     res.status(200).json(result);

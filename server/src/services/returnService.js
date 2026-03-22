@@ -8,8 +8,11 @@ const inventoryService = require('./inventoryService');
 const { ORDER_STATUSES, RETURN_STATUSES } = require('../utils/constants');
 const logger = require('../utils/logger');
 
-const createReturn = async ({ orderId, customerId, storeId, reason, items }) => {
-  const order = await Order.findOne({ _id: orderId, customerId });
+const createReturn = async ({ orderId, customerId, customerEmail, storeId, reason, items }) => {
+  const orderQuery = customerEmail
+    ? { _id: orderId, $or: [{ customerId }, { guestEmail: customerEmail.toLowerCase() }] }
+    : { _id: orderId, customerId };
+  const order = await Order.findOne(orderQuery);
   if (!order) {
     throw new Error('Order not found');
   }
@@ -94,6 +97,23 @@ const createReturn = async ({ orderId, customerId, storeId, reason, items }) => 
   }
 };
 
+const getReturnById = async (returnId, storeId) => {
+  const query = { _id: returnId };
+  if (storeId) query.storeId = storeId;
+  const returnDoc = await Return.findOne(query)
+    .populate('orderId', 'orderNumber total status createdAt deliveryMethod')
+    .populate('customerId', 'firstName lastName email phone')
+    .populate('storeId', 'name storeCode address')
+    .populate('processedBy', 'firstName lastName')
+    .lean();
+
+  if (!returnDoc) throw new Error('Return not found');
+
+  const items = await ReturnItem.find({ returnId }).lean();
+  returnDoc.items = items;
+  return returnDoc;
+};
+
 const getCustomerReturns = async (customerId) => {
   return Return.find({ customerId })
     .sort({ createdAt: -1 })
@@ -103,7 +123,8 @@ const getCustomerReturns = async (customerId) => {
 };
 
 const getStoreReturns = async (storeId, status) => {
-  const query = { storeId };
+  const query = {};
+  if (storeId) query.storeId = storeId;
   if (status) query.status = status;
 
   const returns = await Return.find(query)
@@ -129,7 +150,9 @@ const getStoreReturns = async (storeId, status) => {
 };
 
 const acceptReturn = async (returnId, storeId, storeUserId) => {
-  const returnDoc = await Return.findOne({ _id: returnId, storeId });
+  const acceptQuery = { _id: returnId };
+  if (storeId) acceptQuery.storeId = storeId;
+  const returnDoc = await Return.findOne(acceptQuery);
   if (!returnDoc) {
     throw new Error('Return not found for this store');
   }
@@ -165,13 +188,19 @@ const acceptReturn = async (returnId, storeId, storeUserId) => {
 };
 
 const completeReturn = async (returnId, storeId, storeUserId) => {
-  const returnDoc = await Return.findOne({ _id: returnId, storeId });
+  const completeQuery = { _id: returnId };
+  if (storeId) completeQuery.storeId = storeId;
+  const returnDoc = await Return.findOne(completeQuery);
   if (!returnDoc) {
     throw new Error('Return not found for this store');
   }
 
-  if (returnDoc.status !== RETURN_STATUSES.RETURN_ACCEPTED) {
-    throw new Error(`Cannot complete return in status: ${returnDoc.status}`);
+  const allowedForComplete = [
+    RETURN_STATUSES.RETURN_VERIFIED_PASS,
+    RETURN_STATUSES.RETURN_ACCEPTED,
+  ];
+  if (!allowedForComplete.includes(returnDoc.status)) {
+    throw new Error('Return must be verified (pass) before it can be completed. Please verify the returned product first.');
   }
 
   const returnItems = await ReturnItem.find({ returnId }).lean();
@@ -221,7 +250,9 @@ const completeReturn = async (returnId, storeId, storeUserId) => {
 };
 
 const rejectReturn = async (returnId, storeId, storeUserId, reason) => {
-  const ret = await Return.findOne({ _id: returnId, storeId });
+  const rejectQuery = { _id: returnId };
+  if (storeId) rejectQuery.storeId = storeId;
+  const ret = await Return.findOne(rejectQuery);
   if (!ret) throw new Error('Return not found');
   if (ret.status !== 'RETURN_REQUESTED') {
     throw new Error('Return can only be rejected when in RETURN_REQUESTED status');
@@ -247,18 +278,21 @@ const rejectReturn = async (returnId, storeId, storeUserId, reason) => {
 };
 
 const verifyReturnProduct = async (returnId, storeId, storeUserId, passed) => {
-  const ret = await Return.findOne({ _id: returnId, storeId });
+  const verifyQuery = { _id: returnId };
+  if (storeId) verifyQuery.storeId = storeId;
+  const ret = await Return.findOne(verifyQuery);
   if (!ret) throw new Error('Return not found');
   if (ret.status !== 'RETURN_ACCEPTED') {
     throw new Error('Return must be in RETURN_ACCEPTED status for verification');
   }
 
-  const newStatus = passed ? 'RETURN_VERIFICATION_PENDING' : 'RETURN_VERIFICATION_PENDING';
-  ret.status = newStatus;
+  const returnStatus = passed ? 'RETURN_VERIFIED_PASS' : 'RETURN_VERIFIED_FAIL';
+  const orderStatus = passed ? 'RETURN_VERIFIED_PASS' : 'RETURN_VERIFIED_FAIL';
+
+  ret.status = returnStatus;
   ret.processedBy = storeUserId;
   await ret.save();
 
-  const orderStatus = passed ? 'RETURN_VERIFIED_PASS' : 'RETURN_VERIFIED_FAIL';
   await Order.findByIdAndUpdate(ret.orderId, { status: orderStatus });
   await OrderStatusHistory.create({
     orderId: ret.orderId,
@@ -269,19 +303,24 @@ const verifyReturnProduct = async (returnId, storeId, storeUserId, passed) => {
   });
 
   logger.info(`Return ${ret.returnNumber} verification: ${passed ? 'PASS' : 'FAIL'}`);
-  return ret;
+  return Return.findById(returnId)
+    .populate('orderId', 'orderNumber total')
+    .populate('customerId', 'firstName lastName email phone')
+    .populate('storeId', 'name storeCode address');
 };
 
 const cancelReturn = async (returnId, storeId, storeUserId, reason) => {
-  const ret = await Return.findOne({ _id: returnId, storeId });
+  const cancelQuery = { _id: returnId };
+  if (storeId) cancelQuery.storeId = storeId;
+  const ret = await Return.findOne(cancelQuery);
   if (!ret) throw new Error('Return not found');
-  const cancellable = ['RETURN_REQUESTED', 'RETURN_ACCEPTED'];
+  const cancellable = ['RETURN_REQUESTED', 'RETURN_ACCEPTED', 'RETURN_VERIFIED_FAIL'];
   if (!cancellable.includes(ret.status)) {
     throw new Error('Return cannot be cancelled in its current status');
   }
 
   const prevStatus = ret.status;
-  ret.status = 'RETURN_REJECTED';
+  ret.status = 'RETURN_CANCELLED';
   ret.processedBy = storeUserId;
   ret.processedAt = new Date();
   ret.notes = reason || 'Cancelled by store';
@@ -302,6 +341,7 @@ const cancelReturn = async (returnId, storeId, storeUserId, reason) => {
 
 module.exports = {
   createReturn,
+  getReturnById,
   getCustomerReturns,
   getStoreReturns,
   acceptReturn,

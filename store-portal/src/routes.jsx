@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ReturnsPage from './pages/ReturnsPage';
+import ReturnDetailPage from './pages/ReturnDetailPage';
 import InventoryPage from './pages/InventoryPage';
 import InStoreSalePage from './pages/InStoreSalePage';
 import Sidebar from './components/common/Sidebar';
@@ -63,6 +64,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AuthenticatedLayout>
               <ReturnsPage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/returns/:returnId"
+        element={
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <ReturnDetailPage />
             </AuthenticatedLayout>
           </ProtectedRoute>
         }

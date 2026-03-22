@@ -1,15 +1,16 @@
 import api from './api';
 
 const orderService = {
-  async getOrders(status = '', page = 1, limit = 20) {
+  async getOrders(status = '', page = 1, limit = 20, { allStores = false } = {}) {
     const params = { page, limit, _t: Date.now() };
     if (status) params.status = status;
+    if (allStores) params.allStores = 'true';
     const response = await api.get('/orders', { params, headers: { 'Cache-Control': 'no-cache' } });
     return response.data;
   },
 
   async getOrderById(orderId) {
-    const response = await api.get(`/orders/${orderId}`, { params: { _t: Date.now() }, headers: { 'Cache-Control': 'no-cache' } });
+    const response = await api.get(`/orders/${orderId}`, { params: { _t: Date.now(), allStores: 'true' }, headers: { 'Cache-Control': 'no-cache' } });
     return response.data;
   },
 

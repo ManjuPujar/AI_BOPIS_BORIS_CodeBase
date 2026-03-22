@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FiArrowLeft, FiMapPin, FiTruck, FiPackage, FiCheck, FiX, FiClock, FiShield, FiCheckCircle, FiAlertTriangle, FiXCircle, FiInfo } from 'react-icons/fi';
+import { FiArrowLeft, FiMapPin, FiTruck, FiPackage, FiCheck, FiX, FiClock, FiShield, FiCheckCircle, FiAlertTriangle, FiXCircle, FiInfo, FiRotateCcw } from 'react-icons/fi';
 import useOrderStatus from '../hooks/useOrderStatus';
 import useAuth from '../hooks/useAuth';
 import * as orderService from '../services/orderService';
@@ -72,6 +72,70 @@ const BOPIS_STATUS_MESSAGES = {
     title: 'Order Cancelled',
     message: 'This order has been cancelled. If you were charged, a refund will be processed within 5–7 business days.',
   },
+  RETURN_REQUESTED: {
+    icon: FiRotateCcw,
+    color: '#fbbf24',
+    bg: 'rgba(251,191,36,0.06)',
+    border: 'rgba(251,191,36,0.12)',
+    title: 'Return Requested',
+    message: 'Your return request has been submitted and is awaiting review by the store. You will be notified once the store accepts or responds to your request.',
+  },
+  RETURN_ACCEPTED: {
+    icon: FiCheck,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Accepted',
+    message: 'The store has accepted your return request. Please bring the item(s) to the store for inspection and processing.',
+  },
+  RETURN_COMPLETED: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Complete',
+    message: 'Your return has been processed successfully. A refund will be issued to your original payment method within 5–7 business days.',
+  },
+  RETURN_VERIFICATION_PENDING: {
+    icon: FiShield,
+    color: '#c4b5fd',
+    bg: 'rgba(196,181,253,0.06)',
+    border: 'rgba(196,181,253,0.12)',
+    title: 'Verification In Progress',
+    message: 'The store is inspecting your returned items. You will be notified once verification is complete.',
+  },
+  RETURN_VERIFIED_PASS: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Verified — Passed',
+    message: 'Your returned items have passed inspection. The store is processing your refund. It will be issued within 5–7 business days.',
+  },
+  RETURN_VERIFIED_FAIL: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Return Verification Failed',
+    message: 'Your returned items did not pass store inspection. The return cannot be completed. Please contact customer support for assistance.',
+  },
+  RETURN_REJECTED: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Return Rejected',
+    message: 'Unfortunately, your return request has been declined by the store. Please contact customer support for more information.',
+  },
+  RETURN_CANCELLED: {
+    icon: FiAlertTriangle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Return Cancelled',
+    message: 'This return has been cancelled. If you believe this is an error, please contact customer support.',
+  },
 };
 
 const BOPIS_STEPS = [
@@ -100,7 +164,22 @@ const STATUS_DISPLAY = {
   PICKED_UP: { label: 'Picked Up', color: '#6ee7b7', bg: '#064e3b' },
   COMPLETED: { label: 'Completed', color: '#6ee7b7', bg: '#064e3b' },
   CANCELLED: { label: 'Cancelled', color: '#fca5a5', bg: '#450a0a' },
+  RETURN_REQUESTED: { label: 'Return Requested', color: '#fbbf24', bg: '#422006' },
+  RETURN_ACCEPTED: { label: 'Return Accepted', color: '#93c5fd', bg: '#1e3a5f' },
+  RETURN_REJECTED: { label: 'Return Rejected', color: '#fca5a5', bg: '#450a0a' },
+  RETURN_VERIFICATION_PENDING: { label: 'Return Verification Pending', color: '#c4b5fd', bg: '#3730a3' },
+  RETURN_VERIFIED_PASS: { label: 'Return Verified', color: '#6ee7b7', bg: '#064e3b' },
+  RETURN_VERIFIED_FAIL: { label: 'Return Verification Failed', color: '#fca5a5', bg: '#450a0a' },
+  RETURN_COMPLETED: { label: 'Return Completed', color: '#6ee7b7', bg: '#064e3b' },
+  RETURN_CANCELLED: { label: 'Return Cancelled', color: '#fca5a5', bg: '#450a0a' },
 };
+
+const RETURN_TIMELINE_STEPS = [
+  { key: 'RETURN_REQUESTED', label: 'Return Requested', icon: FiRotateCcw },
+  { key: 'RETURN_ACCEPTED', label: 'Accepted', icon: FiCheck },
+  { key: 'RETURN_VERIFIED_PASS', label: 'Verified', icon: FiShield },
+  { key: 'RETURN_COMPLETED', label: 'Refund Processed', icon: FiCheckCircle },
+];
 
 const OrderDetailPage = () => {
   const { orderId } = useParams();
@@ -114,8 +193,10 @@ const OrderDetailPage = () => {
   }, [searchParams, orderId, user]);
   const { order, loading, error } = useOrderStatus(orderId, guestEmail);
   const navigate = useNavigate();
-  const isGuestView = !!guestEmail;
+  const isGuestView = !user && !!guestEmail;
   const [otpData, setOtpData] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     if (!order) return;
@@ -126,13 +207,16 @@ const OrderDetailPage = () => {
   }, [order?.status, orderId, guestEmail]);
 
   const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel this order?')) return;
+    setCancelLoading(true);
     try {
       await orderService.cancelOrder(orderId, 'Customer requested cancellation');
+      setShowCancelModal(false);
       toast.success('Order cancelled');
       navigate('/orders');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to cancel order');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -164,11 +248,13 @@ const OrderDetailPage = () => {
   }
 
   const isPickup = order.deliveryMethod === 'SHIP_TO_STORE';
+  const isReturnStatus = (order.status || '').startsWith('RETURN_');
   const steps = isPickup ? BOPIS_STEPS : SHIP_STEPS;
-  const currentStepIndex = steps.findIndex((s) => s.key === order.status);
+  const currentStepIndex = isReturnStatus ? steps.length - 1 : steps.findIndex((s) => s.key === order.status);
   const canCancel = ['PLACED', 'AWAITING_STORE_ACCEPTANCE'].includes(order.status);
-  const canReturn = ['PICKED_UP', 'DELIVERED', 'COMPLETED'].includes(order.status);
+  const canReturn = order.status === 'COMPLETED';
   const statusInfo = STATUS_DISPLAY[order.status] || { label: order.status, color: '#8E8E92', bg: '#1b1b1f' };
+  const orderReturns = order.returns || [];
 
   const storeInfo = order.storeId || order.store;
   const storeAddress = storeInfo?.address;
@@ -203,20 +289,23 @@ const OrderDetailPage = () => {
             <span style={{ ...styles.statusBadge, backgroundColor: statusInfo.bg, color: statusInfo.color }}>
               {statusInfo.label}
             </span>
-            {!isGuestView && (
-              <div style={styles.actions}>
-                {canCancel && (
-                  <button onClick={handleCancel} style={styles.cancelBtn}>
-                    <FiX size={14} /> Cancel Order
-                  </button>
-                )}
-                {canReturn && (
-                  <Link to={`/returns/${orderId}`} style={styles.returnBtn}>
-                    Return Items
-                  </Link>
-                )}
-              </div>
-            )}
+            <div style={styles.actions}>
+              {!isGuestView && canCancel && (
+                <button onClick={() => setShowCancelModal(true)} style={styles.cancelBtn}>
+                  <FiX size={14} /> Cancel Order
+                </button>
+              )}
+              {canReturn && user && (
+                <Link to={`/returns/${orderId}`} style={styles.returnBtn}>
+                  <FiRotateCcw size={13} /> Return
+                </Link>
+              )}
+              {canReturn && !user && (
+                <Link to="/login" style={styles.returnBtn}>
+                  Log In to Return
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
@@ -261,8 +350,8 @@ const OrderDetailPage = () => {
           </div>
         )}
 
-        {/* Dynamic BOPIS Status Message */}
-        {isPickup && BOPIS_STATUS_MESSAGES[order.status] && !['CANCELLED', 'REJECTED'].includes(order.status) && (() => {
+        {/* Dynamic Status Message */}
+        {BOPIS_STATUS_MESSAGES[order.status] && (() => {
           const statusMsg = BOPIS_STATUS_MESSAGES[order.status];
           const StatusIcon = statusMsg.icon;
           return (
@@ -321,6 +410,34 @@ const OrderDetailPage = () => {
           </div>
         )}
 
+        {/* Return Action Banner */}
+        {canReturn && !isReturnStatus && orderReturns.length === 0 && (
+          <div style={styles.returnActionBanner}>
+            <div style={styles.returnActionContent}>
+              <div style={styles.returnActionIconWrap}>
+                <FiRotateCcw size={24} color="#E8E8E8" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={styles.returnActionTitle}>Need to return an item?</h3>
+                <p style={styles.returnActionText}>
+                  {user
+                    ? 'You can initiate a return within 30 days of order completion. Returns are processed at your pickup store.'
+                    : 'Log in to your account to initiate a return within 30 days of completion.'}
+                </p>
+              </div>
+              {user ? (
+                <Link to={`/returns/${orderId}`} style={styles.returnActionBtn}>
+                  <FiRotateCcw size={14} /> Return
+                </Link>
+              ) : (
+                <Link to="/login" style={styles.returnActionBtn}>
+                  Log In to Return
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
         {order.status === 'CANCELLED' && (
           <div style={styles.cancelledBanner}>
             <FiX size={20} /> This order has been cancelled.
@@ -332,6 +449,105 @@ const OrderDetailPage = () => {
           <div style={styles.cancelledBanner}>
             <FiX size={20} /> This order was rejected by the store.
             {order.notes && <span style={{ fontWeight: 400, marginLeft: 4 }}>— {order.notes}</span>}
+          </div>
+        )}
+
+        {/* Return Timeline */}
+        {orderReturns.length > 0 && isReturnStatus && (() => {
+          const retStatus = order.status;
+          const isFailed = ['RETURN_REJECTED', 'RETURN_CANCELLED', 'RETURN_VERIFIED_FAIL'].includes(retStatus);
+          const getReturnTimelineIdx = () => {
+            if (retStatus === 'RETURN_COMPLETED') return 3;
+            if (retStatus === 'RETURN_VERIFIED_PASS') return 2;
+            if (retStatus === 'RETURN_VERIFICATION_PENDING') return 2;
+            if (retStatus === 'RETURN_ACCEPTED') return 1;
+            if (retStatus === 'RETURN_REQUESTED') return 0;
+            return -1;
+          };
+          const retTimelineIdx = getReturnTimelineIdx();
+          if (isFailed) return null;
+          return (
+            <div style={styles.tracker}>
+              {RETURN_TIMELINE_STEPS.map((step, i) => {
+                const isActive = i <= retTimelineIdx;
+                const isCurrent = i === retTimelineIdx;
+                const StepIcon = step.icon;
+                return (
+                  <div key={step.key} style={styles.step}>
+                    <div style={{
+                      ...styles.stepDot,
+                      backgroundColor: isActive ? '#E8E8E8' : 'rgba(255,255,255,0.05)',
+                      ...(isCurrent ? { boxShadow: '0 0 0 4px rgba(232,232,232,0.15)', transform: 'scale(1.1)' } : {}),
+                    }}>
+                      {isActive ? <StepIcon size={14} color="#1b1b1f" /> : <span style={styles.stepNum}>{i + 1}</span>}
+                    </div>
+                    {i < RETURN_TIMELINE_STEPS.length - 1 && (
+                      <div style={{ ...styles.stepLine, backgroundColor: i < retTimelineIdx ? '#E8E8E8' : 'rgba(255,255,255,0.05)' }} />
+                    )}
+                    <span style={{ ...styles.stepLabel, fontWeight: isCurrent ? 700 : 400, color: isActive ? '#E8E8E8' : '#5C5C60' }}>{step.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Return Information */}
+        {orderReturns.length > 0 && (
+          <div style={styles.returnCard}>
+            <h3 style={styles.cardTitle}><FiRotateCcw size={18} /> Return Details</h3>
+            {orderReturns.map((ret) => {
+              const retStatusInfo = {
+                RETURN_REQUESTED: { label: 'Pending Review', color: '#fbbf24', bg: 'rgba(251,191,36,0.08)' },
+                RETURN_ACCEPTED: { label: 'Accepted', color: '#60a5fa', bg: 'rgba(96,165,250,0.08)' },
+                RETURN_VERIFICATION_PENDING: { label: 'Verification Pending', color: '#c4b5fd', bg: 'rgba(196,181,253,0.08)' },
+                RETURN_VERIFIED_PASS: { label: 'Verified — Pass', color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+                RETURN_VERIFIED_FAIL: { label: 'Verification Failed', color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+                RETURN_COMPLETED: { label: 'Completed', color: '#34d399', bg: 'rgba(52,211,153,0.08)' },
+                RETURN_REJECTED: { label: 'Rejected', color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+                RETURN_CANCELLED: { label: 'Cancelled', color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+              }[ret.status] || { label: ret.status?.replace(/_/g, ' '), color: '#8E8E92', bg: 'rgba(142,142,146,0.08)' };
+
+              return (
+                <div key={ret._id} style={styles.returnEntry}>
+                  <div style={styles.returnHeader}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: '#E8E8E8' }}>
+                        Return #{ret.returnNumber}
+                      </span>
+                      <span style={{ fontSize: 12, color: '#5C5C60', marginLeft: 10 }}>
+                        {new Date(ret.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 10px', borderRadius: 20, backgroundColor: retStatusInfo.bg, color: retStatusInfo.color }}>
+                      {retStatusInfo.label}
+                    </span>
+                  </div>
+                  {ret.reason && (
+                    <p style={{ fontSize: 13, color: '#8E8E92', margin: '8px 0 0' }}>
+                      <strong>Reason:</strong> {ret.reason}
+                    </p>
+                  )}
+                  {ret.items && ret.items.length > 0 && (
+                    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {ret.items.map((ri, i) => (
+                        <div key={i} style={styles.returnItem}>
+                          <span style={{ fontSize: 13, color: '#E8E8E8' }}>{ri.productName}</span>
+                          <span style={{ fontSize: 12, color: '#5C5C60' }}>
+                            {ri.size && `Size ${ri.size}`}{ri.color && ` · ${ri.color}`} · Qty {ri.quantity}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {ret.refundAmount > 0 && (
+                    <p style={{ fontSize: 13, color: '#34d399', marginTop: 8, fontWeight: 600 }}>
+                      Refund: {formatCurrency(ret.refundAmount)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -459,6 +675,27 @@ const OrderDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Cancel Order Modal */}
+        {showCancelModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowCancelModal(false)}>
+            <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <FiAlertTriangle size={32} color="#f87171" />
+              </div>
+              <h3 style={styles.modalTitle}>Cancel This Order?</h3>
+              <p style={styles.modalDesc}>
+                This action cannot be undone. Your order will be cancelled and any reserved inventory will be released.
+              </p>
+              <div style={styles.modalBtnRow}>
+                <button onClick={() => setShowCancelModal(false)} style={styles.modalKeepBtn}>Keep Order</button>
+                <button onClick={handleCancel} disabled={cancelLoading} style={styles.modalCancelConfirmBtn}>
+                  {cancelLoading ? 'Cancelling...' : 'Yes, Cancel Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -475,7 +712,7 @@ const styles = {
   statusBadge: { fontSize: 12, fontWeight: 700, padding: '6px 14px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: 0.5 },
   actions: { display: 'flex', gap: 8 },
   cancelBtn: { display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px', border: '1px solid #f87171', borderRadius: 8, backgroundColor: 'transparent', color: '#f87171', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'opacity 220ms ease' },
-  returnBtn: { display: 'inline-flex', alignItems: 'center', padding: '8px 16px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, backgroundColor: 'transparent', color: '#E8E8E8', fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'border-color 220ms ease' },
+  returnBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, backgroundColor: 'transparent', color: '#E8E8E8', fontSize: 13, fontWeight: 600, textDecoration: 'none', transition: 'border-color 220ms ease' },
   tracker: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 32, padding: '28px 20px', backgroundColor: '#1b1b1f', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', position: 'relative', boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)' },
   step: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, flex: 1, position: 'relative' },
   stepDot: { width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, transition: 'all 220ms ease' },
@@ -513,6 +750,23 @@ const styles = {
   otpDisplay: { display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 16 },
   otpDigit: { width: 56, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800, color: '#E8E8E8', backgroundColor: '#141417', borderRadius: 10, border: '1px solid rgba(196,181,253,0.2)', letterSpacing: 2 },
   otpInfo: { textAlign: 'center' },
+  returnActionBanner: { marginBottom: 24 },
+  returnActionContent: { display: 'flex', alignItems: 'center', gap: 16, padding: '20px 24px', backgroundColor: '#1b1b1f', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)', flexWrap: 'wrap' },
+  returnActionIconWrap: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(200,16,46,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  returnActionTitle: { fontSize: 15, fontWeight: 700, color: '#E8E8E8', marginBottom: 4 },
+  returnActionText: { fontSize: 13, color: '#8E8E92', lineHeight: 1.5, margin: 0 },
+  returnActionBtn: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', backgroundColor: '#c8102e', color: '#fff', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none', whiteSpace: 'nowrap', transition: 'opacity 220ms ease', letterSpacing: 0.3 },
+  returnCard: { backgroundColor: '#1b1b1f', borderRadius: 12, padding: 24, border: '1px solid rgba(251,191,36,0.15)', marginBottom: 24, boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)' },
+  returnEntry: { padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' },
+  returnHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  returnItem: { display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.04)' },
+  modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)' },
+  modal: { backgroundColor: '#1b1b1f', borderRadius: 14, padding: 32, maxWidth: 420, width: '90%', boxShadow: '0 16px 48px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)' },
+  modalTitle: { fontSize: 20, fontWeight: 700, marginBottom: 6, textAlign: 'center', color: '#E8E8E8' },
+  modalDesc: { fontSize: 13, color: '#8E8E92', marginBottom: 20, textAlign: 'center', lineHeight: 1.6 },
+  modalBtnRow: { display: 'flex', gap: 12 },
+  modalKeepBtn: { flex: 1, padding: '12px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', backgroundColor: 'transparent', cursor: 'pointer', fontWeight: 600, fontSize: 14, color: '#8E8E92' },
+  modalCancelConfirmBtn: { flex: 1, padding: '12px 20px', borderRadius: 8, border: 'none', backgroundColor: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14 },
 };
 
 export default OrderDetailPage;

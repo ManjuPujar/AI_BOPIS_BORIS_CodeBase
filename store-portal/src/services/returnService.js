@@ -1,10 +1,16 @@
 import api from './api';
 
 const returnService = {
-  async getReturns(status = '') {
+  async getReturns(status = '', { allStores = false } = {}) {
     const params = {};
     if (status) params.status = status;
+    if (allStores) params.allStores = 'true';
     const response = await api.get('/returns', { params });
+    return response.data;
+  },
+
+  async getReturnById(returnId) {
+    const response = await api.get(`/returns/${returnId}`, { params: { allStores: 'true', _t: Date.now() }, headers: { 'Cache-Control': 'no-cache' } });
     return response.data;
   },
 

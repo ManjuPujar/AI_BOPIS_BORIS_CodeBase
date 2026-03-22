@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const OrderItem = require('../models/OrderItem');
 const OrderStatusHistory = require('../models/OrderStatusHistory');
 const Product = require('../models/Product');
+const Return = require('../models/Return');
+const ReturnItem = require('../models/ReturnItem');
 const inventoryService = require('./inventoryService');
 const InventoryTransaction = require('../models/InventoryTransaction');
 const Customer = require('../models/Customer');
@@ -172,17 +174,21 @@ const createOrder = async ({ customerId, deliveryMethod, storeId, items, shippin
   }
 };
 
-const getCustomerOrders = async (customerId, page = 1, limit = 10) => {
+const getCustomerOrders = async (customerId, page = 1, limit = 10, customerEmail) => {
   const skip = (page - 1) * limit;
 
+  const query = customerEmail
+    ? { $or: [{ customerId }, { guestEmail: customerEmail.toLowerCase() }] }
+    : { customerId };
+
   const [orders, total] = await Promise.all([
-    Order.find({ customerId })
+    Order.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .populate('storeId', 'name storeCode address')
       .lean(),
-    Order.countDocuments({ customerId }),
+    Order.countDocuments(query),
   ]);
 
   const orderIds = orders.map((o) => o._id);
@@ -239,9 +245,10 @@ const getOrderById = async (orderId, customerId, guestEmail) => {
     throw new Error('Authentication required');
   }
 
-  const [rawItems, statusHistory] = await Promise.all([
+  const [rawItems, statusHistory, returns] = await Promise.all([
     OrderItem.find({ orderId }).populate('productId', 'images').lean(),
     OrderStatusHistory.find({ orderId }).sort({ createdAt: 1 }).lean(),
+    Return.find({ orderId }).populate('storeId', 'name').lean(),
   ]);
 
   const items = rawItems.map((item) => ({
@@ -249,16 +256,28 @@ const getOrderById = async (orderId, customerId, guestEmail) => {
     image: item.productId?.images?.[0] || null,
   }));
 
+  let returnItems = [];
+  if (returns.length > 0) {
+    const returnIds = returns.map((r) => r._id);
+    returnItems = await ReturnItem.find({ returnId: { $in: returnIds } }).lean();
+  }
+  const returnsWithItems = returns.map((r) => ({
+    ...r,
+    items: returnItems.filter((ri) => ri.returnId.toString() === r._id.toString()),
+  }));
+
   return {
     ...order.toObject(),
     items,
     statusHistory,
+    returns: returnsWithItems,
   };
 };
 
 const getStoreOrders = async (storeId, status, page = 1, limit = 20) => {
   const skip = (page - 1) * limit;
-  const query = { storeId };
+  const query = {};
+  if (storeId) query.storeId = storeId;
   if (status) query.status = status;
 
   const [orders, total] = await Promise.all([
@@ -301,7 +320,10 @@ const getStoreOrders = async (storeId, status, page = 1, limit = 20) => {
 };
 
 const getStoreOrderById = async (orderId, storeId) => {
-  const order = await Order.findOne({ _id: orderId, storeId })
+  const query = { _id: orderId };
+  if (storeId) query.storeId = storeId;
+
+  const order = await Order.findOne(query)
     .populate('customerId', 'firstName lastName email phone')
     .populate('storeId', 'name storeCode address phone');
 
@@ -327,7 +349,9 @@ const getStoreOrderById = async (orderId, storeId) => {
 };
 
 const acceptOrder = async (orderId, storeId, pickupReadyTime, storeUserId) => {
-  const order = await Order.findOne({ _id: orderId, storeId });
+  const query = { _id: orderId };
+  if (storeId) query.storeId = storeId;
+  const order = await Order.findOne(query);
   if (!order) {
     throw new Error('Order not found for this store');
   }
@@ -467,7 +491,9 @@ const getPickupOtp = async (orderId, customerId, guestEmail) => {
 };
 
 const verifyPickupOtp = async (orderId, otp, storeId, storeUserId) => {
-  const order = await Order.findOne({ _id: orderId, storeId }).select('+pickupOtpHash');
+  const otpQuery = { _id: orderId };
+  if (storeId) otpQuery.storeId = storeId;
+  const order = await Order.findOne(otpQuery).select('+pickupOtpHash');
   if (!order) throw new Error('Order not found for this store');
 
   if (order.otpVerificationStatus === 'VERIFIED') {
@@ -524,7 +550,9 @@ const verifyPickupOtp = async (orderId, otp, storeId, storeUserId) => {
 };
 
 const regeneratePickupOtp = async (orderId, storeId, storeUserId) => {
-  const order = await Order.findOne({ _id: orderId, storeId }).select('+pickupOtpHash');
+  const regenQuery = { _id: orderId };
+  if (storeId) regenQuery.storeId = storeId;
+  const order = await Order.findOne(regenQuery).select('+pickupOtpHash');
   if (!order) throw new Error('Order not found for this store');
 
   if (order.status !== ORDER_STATUSES.READY_FOR_PICKUP) {
@@ -545,8 +573,11 @@ const regeneratePickupOtp = async (orderId, storeId, storeUserId) => {
   return { pickupOtp: plainOtp, otpExpiresAt: order.otpExpiresAt };
 };
 
-const cancelOrder = async (orderId, customerId, reason) => {
-  const order = await Order.findOne({ _id: orderId, customerId });
+const cancelOrder = async (orderId, customerId, reason, customerEmail) => {
+  const cancelQuery = customerEmail
+    ? { _id: orderId, $or: [{ customerId }, { guestEmail: customerEmail.toLowerCase() }] }
+    : { _id: orderId, customerId };
+  const order = await Order.findOne(cancelQuery);
   if (!order) {
     throw new Error('Order not found');
   }
@@ -612,7 +643,9 @@ const lookupGuestOrders = async (email) => {
 };
 
 const rejectOrder = async (orderId, storeId, storeUserId, reason) => {
-  const order = await Order.findOne({ _id: orderId, storeId });
+  const rejectQuery = { _id: orderId };
+  if (storeId) rejectQuery.storeId = storeId;
+  const order = await Order.findOne(rejectQuery);
   if (!order) throw new Error('Order not found in this store');
   if (order.status !== 'AWAITING_STORE_ACCEPTANCE') {
     throw new Error('Order can only be rejected from AWAITING_STORE_ACCEPTANCE status');

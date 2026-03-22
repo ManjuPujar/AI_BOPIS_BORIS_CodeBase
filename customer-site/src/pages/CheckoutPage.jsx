@@ -146,8 +146,11 @@ const CheckoutPage = () => {
     if (errs[name]) setErrors((prev) => ({ ...prev, [name]: errs[name] }));
   };
 
+  const [submitError, setSubmitError] = useState('');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
 
     const errs = validate();
     if (Object.keys(errs).length > 0) {
@@ -156,6 +159,7 @@ const CheckoutPage = () => {
       const firstKey = Object.keys(errs)[0];
       const el = document.querySelector(`[name="${firstKey}"]`);
       if (el) el.focus();
+      toast.error('Please fix the highlighted fields before placing your order.');
       return;
     }
 
@@ -164,22 +168,32 @@ const CheckoutPage = () => {
       return;
     }
 
+    const resolvedStoreId = selectedStore?._id || selectedStore?.id || null;
+
+    if (isPickup && !resolvedStoreId) {
+      toast.error('Your pickup store selection is missing or outdated. Please go back to your cart and re-select a store.');
+      navigate('/cart');
+      return;
+    }
+
     setLoading(true);
     try {
+      const storeId = resolvedStoreId;
+
       const orderData = {
         items: cart.map((item) => ({
           productId: item.productId,
-          sku: item.sku,
+          sku: item.sku || item.productId,
           productName: item.productName,
-          size: item.size,
-          color: item.color,
-          quantity: item.quantity,
+          size: item.size || 'ONE SIZE',
+          color: item.color || '',
+          quantity: Number(item.quantity) || 1,
           unitPrice: item.unitPrice,
         })),
         fulfillment: {
           method: deliveryMethod,
-          store: isPickup && selectedStore
-            ? { storeId: selectedStore._id || selectedStore.id, name: selectedStore.name }
+          store: isPickup && storeId
+            ? { storeId, name: selectedStore.name }
             : undefined,
           shippingAddress: !isPickup ? {
             street: shippingInfo.street,
@@ -209,7 +223,31 @@ const CheckoutPage = () => {
         state: { guestEmail: shippingInfo.email },
       });
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to place order. Please try again.');
+      const serverMsg = err.response?.data?.message || '';
+      const validationErrors = err.response?.data?.errors;
+      const isStaleData = serverMsg.includes('Insufficient inventory') ||
+        serverMsg.includes('store undefined') ||
+        serverMsg.includes('Product not found');
+
+      if (isStaleData) {
+        const staleMsg = 'Your cart contains items from a previous session that are no longer valid. Redirecting to products page...';
+        setSubmitError(staleMsg);
+        toast.error(staleMsg, { autoClose: 5000 });
+        clearCart();
+        setTimeout(() => navigate('/products'), 2000);
+      } else {
+        let displayMsg = 'Failed to place order. Please try again.';
+        if (validationErrors?.length > 0) {
+          displayMsg = validationErrors.map((e) => e.msg).join('. ');
+        } else if (serverMsg) {
+          displayMsg = serverMsg;
+        } else if (err.message) {
+          displayMsg = err.message;
+        }
+        setSubmitError(displayMsg);
+        toast.error(displayMsg);
+      }
+      console.error('[Checkout] Order failed:', err.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -373,6 +411,11 @@ const CheckoutPage = () => {
               <div style={{ ...styles.summaryRow, fontWeight: 700, fontSize: 17, color: '#E8E8E8' }}>
                 <span>Total</span><span>{formatCurrency(total)}</span>
               </div>
+              {submitError && (
+                <div style={{ padding: '10px 14px', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#f87171' }}>
+                  {submitError}
+                </div>
+              )}
               <button
                 type="submit"
                 style={{ ...styles.placeOrderBtn, ...(!allFieldsFilled || loading ? styles.placeOrderBtnDisabled : {}) }}
@@ -380,6 +423,11 @@ const CheckoutPage = () => {
               >
                 {loading ? 'Placing Order...' : 'Place Order'}
               </button>
+              {!allFieldsFilled && !missingStore && cart.length > 0 && (
+                <p style={{ fontSize: 11, color: '#8E8E92', marginTop: 8, textAlign: 'center' }}>
+                  Please fill in all required fields to place your order.
+                </p>
+              )}
               {missingStore && (
                 <p style={styles.storeWarning}>
                   <FiAlertCircle size={14} /> A pickup store must be selected to place your order.

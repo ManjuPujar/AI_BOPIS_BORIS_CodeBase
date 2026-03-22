@@ -124,7 +124,10 @@ export default function InStoreSalePage() {
 
   const canSubmit = cart.length > 0 && customerInfo.email.trim();
 
+  const [submitError, setSubmitError] = useState('');
+
   const handleSubmit = async () => {
+    setSubmitError('');
     if (!customerInfo.email.trim()) {
       toast.error('Customer email is required');
       return;
@@ -135,23 +138,43 @@ export default function InStoreSalePage() {
     }
     setLoading(true);
     try {
-      await api.post('/in-store-sales', {
+      const saleData = {
         items: cart.map((c) => ({
           productId: c.productId,
+          sku: c.sku || c.productId,
           size: c.size,
           color: c.color,
-          quantity: c.quantity,
+          quantity: Number(c.quantity) || 1,
         })),
-        customerInfo,
-      });
+        customerInfo: {
+          email: customerInfo.email.trim(),
+          name: customerInfo.name.trim() || undefined,
+          phone: customerInfo.phone.trim() || undefined,
+        },
+      };
+      await api.post('/in-store-sales', saleData);
       toast.success('In-store sale recorded successfully!');
       setCart([]);
       setCustomerInfo({ name: '', email: '', phone: '' });
       setSearchResults([]);
       setSearchTerm('');
+      setSubmitError('');
       fetchRecentSales();
+      window.dispatchEvent(new Event('order-action'));
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to record sale');
+      const serverMsg = err.response?.data?.message;
+      const validationErrors = err.response?.data?.errors;
+      let displayMsg = 'Failed to record sale';
+      if (validationErrors?.length > 0) {
+        displayMsg = validationErrors.map((e) => e.msg).join('. ');
+      } else if (serverMsg) {
+        displayMsg = serverMsg;
+      } else if (err.message) {
+        displayMsg = err.message;
+      }
+      setSubmitError(displayMsg);
+      toast.error(displayMsg);
+      console.error('[InStoreSale] Sale failed:', err.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -334,6 +357,11 @@ export default function InStoreSalePage() {
                     <span>Total</span><span>${total.toFixed(2)}</span>
                   </div>
                 </div>
+                {submitError && (
+                  <div style={{ padding: '10px 14px', backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, marginTop: 12, fontSize: 12, color: '#f87171' }}>
+                    {submitError}
+                  </div>
+                )}
                 <button
                   onClick={handleSubmit}
                   disabled={loading || !canSubmit}

@@ -1,5 +1,6 @@
-import React, { createContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import * as cartService from '../services/cartService';
+import api from '../services/api';
 
 export const CartContext = createContext(null);
 
@@ -7,17 +8,61 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
+  const mountedRef = useRef(false);
 
   useEffect(() => {
-    setCart(cartService.getCart());
+    const savedCart = cartService.getCart();
+    setCart(savedCart);
 
-    const savedStore = localStorage.getItem('converse_selected_store');
-    if (savedStore) {
-      try { setSelectedStore(JSON.parse(savedStore)); } catch { /* ignore */ }
+    let savedStore = null;
+    const savedStoreJson = localStorage.getItem('converse_selected_store');
+    if (savedStoreJson) {
+      try { savedStore = JSON.parse(savedStoreJson); } catch { /* ignore */ }
     }
+    if (savedStore) setSelectedStore(savedStore);
 
     const savedMethod = localStorage.getItem('converse_delivery_method');
     if (savedMethod) setDeliveryMethod(savedMethod);
+
+    if (savedCart.length === 0 && !savedStore) {
+      mountedRef.current = true;
+      return;
+    }
+
+    const validateStoredData = async () => {
+      try {
+        if (savedCart.length > 0) {
+          const { data } = await api.get('/products');
+          const validIds = new Set((data.products || []).map((p) => p._id));
+          const validCart = savedCart.filter((item) => validIds.has(item.productId));
+          if (validCart.length !== savedCart.length) {
+            cartService.clearCart();
+            for (const item of validCart) cartService.addToCart(item);
+            setCart(validCart);
+          }
+        }
+
+        if (savedStore?._id) {
+          try {
+            const { data } = await api.get(`/stores/${savedStore._id}`);
+            if (data.store) {
+              setSelectedStore(data.store);
+            }
+          } catch (storeErr) {
+            if (storeErr.response?.status === 404) {
+              setSelectedStore(null);
+              localStorage.removeItem('converse_selected_store');
+            }
+          }
+        }
+      } catch {
+        // Validation failed - leave data as-is, checkout will handle errors
+      } finally {
+        mountedRef.current = true;
+      }
+    };
+
+    validateStoredData();
   }, []);
 
   useEffect(() => {

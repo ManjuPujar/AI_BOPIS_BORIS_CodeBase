@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { FiPackage, FiChevronRight, FiBox } from 'react-icons/fi';
+import { FiPackage, FiChevronRight, FiBox, FiRotateCcw } from 'react-icons/fi';
 import * as orderService from '../services/orderService';
 import { formatCurrency } from '../utils/formatCurrency';
+
+const REFRESH_INTERVAL = 15000;
 
 const statusColors = {
   PLACED: { bg: '#1e3a5f', color: '#93c5fd' },
@@ -24,22 +26,40 @@ const OrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const fetchingRef = useRef(false);
+
+  const fetchOrders = useCallback(async (silent = false) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    if (!silent) setLoading(true);
+    try {
+      const data = await orderService.getMyOrders(page, 10);
+      setOrders(data.orders || data || []);
+      setTotalPages(data.pagination?.pages || data.totalPages || 1);
+    } catch {
+      if (!silent) setOrders([]);
+    } finally {
+      if (!silent) setLoading(false);
+      fetchingRef.current = false;
+    }
+  }, [page]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      try {
-        const data = await orderService.getMyOrders(page, 10);
-        setOrders(data.orders || data || []);
-        setTotalPages(data.pagination?.pages || data.totalPages || 1);
-      } catch {
-        setOrders([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchOrders();
-  }, [page]);
+    const interval = setInterval(() => fetchOrders(true), REFRESH_INTERVAL);
+
+    const onVisible = () => { if (!document.hidden) fetchOrders(true); };
+    const onFocus = () => fetchOrders(true);
+
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchOrders]);
 
   const formatDate = (date) =>
     new Date(date).toLocaleDateString('en-US', {
@@ -128,7 +148,18 @@ const OrdersPage = () => {
                     <span style={styles.orderTotal}>
                       {formatCurrency(order.total)} &middot; {(order.items || []).reduce((s, i) => s + (i.quantity || 1), 0)} items
                     </span>
-                    <FiChevronRight size={18} color="#5C5C60" />
+                    <div style={styles.orderActions}>
+                      {order.status === 'COMPLETED' && (
+                        <Link
+                          to={`/returns/${order._id || order.id}`}
+                          style={styles.returnLink}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <FiRotateCcw size={12} /> Return
+                        </Link>
+                      )}
+                      <FiChevronRight size={18} color="#5C5C60" />
+                    </div>
                   </div>
                 </Link>
               );
@@ -173,6 +204,8 @@ const styles = {
   moreItems: { fontSize: 12, color: '#5C5C60' },
   orderFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 12 },
   orderTotal: { fontSize: 14, fontWeight: 600, color: '#E8E8E8' },
+  orderActions: { display: 'flex', alignItems: 'center', gap: 12 },
+  returnLink: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: '#E8E8E8', padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', textDecoration: 'none', backgroundColor: 'rgba(255,255,255,0.04)', transition: 'background-color 220ms ease' },
   empty: { textAlign: 'center', padding: '60px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 },
   emptyText: { fontSize: 14, color: '#5C5C60' },
   shopBtn: { display: 'inline-block', backgroundColor: '#c8102e', color: '#fff', padding: '12px 32px', borderRadius: 8, fontWeight: 600, fontSize: 14, textDecoration: 'none', marginTop: 8, transition: 'opacity 220ms ease' },

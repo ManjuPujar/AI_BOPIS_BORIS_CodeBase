@@ -2,7 +2,7 @@ const returnService = require('../../services/returnService');
 
 const createReturn = async (req, res, next) => {
   try {
-    const returnData = { ...req.body, customerId: req.customer._id };
+    const returnData = { ...req.body, customerId: req.customer._id, customerEmail: req.customer.email };
     const returnRecord = await returnService.createReturn(returnData);
     res.status(201).json(returnRecord);
   } catch (error) {

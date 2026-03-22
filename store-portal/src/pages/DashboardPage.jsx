@@ -60,10 +60,10 @@ export default function DashboardPage() {
   const fetchCounts = useCallback(async () => {
     try {
       const [awaitingRes, acceptedRes, readyRes, returnsRes] = await Promise.allSettled([
-        orderService.getOrders('AWAITING_STORE_ACCEPTANCE', 1, 1),
-        orderService.getOrders('ACCEPTED', 1, 1),
-        orderService.getOrders('READY_FOR_PICKUP', 1, 1),
-        returnService.getReturns('RETURN_REQUESTED'),
+        orderService.getOrders('AWAITING_STORE_ACCEPTANCE', 1, 1, { allStores: true }),
+        orderService.getOrders('ACCEPTED', 1, 1, { allStores: true }),
+        orderService.getOrders('READY_FOR_PICKUP', 1, 1, { allStores: true }),
+        returnService.getReturns('RETURN_REQUESTED', { allStores: true }),
       ]);
 
       const extractCount = (res) => {

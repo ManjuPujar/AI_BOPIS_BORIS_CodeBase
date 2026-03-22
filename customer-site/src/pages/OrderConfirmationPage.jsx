@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { FiCheckCircle, FiMapPin, FiTruck, FiArrowRight, FiPackage, FiCheck, FiClock, FiShoppingBag, FiInfo, FiShield, FiAlertTriangle, FiXCircle } from 'react-icons/fi';
+import { FiCheckCircle, FiMapPin, FiTruck, FiArrowRight, FiPackage, FiCheck, FiClock, FiShoppingBag, FiInfo, FiShield, FiAlertTriangle, FiXCircle, FiRotateCcw } from 'react-icons/fi';
 import useOrderStatus from '../hooks/useOrderStatus';
 import useAuth from '../hooks/useAuth';
 import * as orderService from '../services/orderService';
@@ -71,6 +71,70 @@ const BOPIS_STATUS_MESSAGES = {
     title: 'Order Cancelled',
     message: 'This order has been cancelled. If you were charged, a refund will be processed within 5–7 business days.',
   },
+  RETURN_REQUESTED: {
+    icon: FiRotateCcw,
+    color: '#fbbf24',
+    bg: 'rgba(251,191,36,0.06)',
+    border: 'rgba(251,191,36,0.12)',
+    title: 'Return Requested',
+    message: 'Your return request has been submitted and is awaiting review by the store. You will be notified once the store responds.',
+  },
+  RETURN_ACCEPTED: {
+    icon: FiCheck,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Accepted',
+    message: 'The store has accepted your return. Please bring the item(s) to the store for inspection and processing.',
+  },
+  RETURN_COMPLETED: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Complete',
+    message: 'Your return has been processed. A refund will be issued to your original payment method within 5–7 business days.',
+  },
+  RETURN_VERIFICATION_PENDING: {
+    icon: FiShield,
+    color: '#c4b5fd',
+    bg: 'rgba(196,181,253,0.06)',
+    border: 'rgba(196,181,253,0.12)',
+    title: 'Verification In Progress',
+    message: 'The store is inspecting your returned items. You will be notified once verification is complete.',
+  },
+  RETURN_VERIFIED_PASS: {
+    icon: FiCheckCircle,
+    color: '#34d399',
+    bg: 'rgba(52,211,153,0.06)',
+    border: 'rgba(52,211,153,0.12)',
+    title: 'Return Verified',
+    message: 'Your returned items passed inspection. The store is processing your refund.',
+  },
+  RETURN_VERIFIED_FAIL: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Verification Failed',
+    message: 'Your returned items did not pass store inspection. Please contact customer support.',
+  },
+  RETURN_REJECTED: {
+    icon: FiXCircle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Return Rejected',
+    message: 'Your return request has been declined. Please contact customer support for more information.',
+  },
+  RETURN_CANCELLED: {
+    icon: FiAlertTriangle,
+    color: '#f87171',
+    bg: 'rgba(248,113,113,0.06)',
+    border: 'rgba(248,113,113,0.12)',
+    title: 'Return Cancelled',
+    message: 'This return has been cancelled.',
+  },
 };
 
 const BOPIS_STEPS = [
@@ -131,6 +195,8 @@ const OrderConfirmationPage = () => {
   const isBOPIS = order.deliveryMethod === 'SHIP_TO_STORE';
   const steps = isBOPIS ? BOPIS_STEPS : SHIP_STEPS;
   const currentIdx = steps.findIndex((st) => st.key === order.status);
+  const canReturn = order.status === 'COMPLETED';
+  const isReturnStatus = (order.status || '').startsWith('RETURN_');
   const storeName = order.store?.name || order.storeId?.name || 'your selected store';
   const storeAddr = order.store?.address || order.storeId?.address;
   const formattedAddr = storeAddr && typeof storeAddr === 'object'
@@ -154,7 +220,7 @@ const OrderConfirmationPage = () => {
           </p>
         </div>
 
-        {isBOPIS && BOPIS_STATUS_MESSAGES[order.status] && (() => {
+        {BOPIS_STATUS_MESSAGES[order.status] && (() => {
           const statusMsg = BOPIS_STATUS_MESSAGES[order.status];
           const StatusIcon = statusMsg.icon;
           return (
@@ -337,12 +403,48 @@ const OrderConfirmationPage = () => {
           </div>
         </div>
 
+        {/* Return Banner */}
+        {canReturn && !isReturnStatus && (
+          <div style={s.returnBanner}>
+            <div style={s.returnBannerContent}>
+              <FiRotateCcw size={22} color="#E8E8E8" />
+              <div>
+                <h3 style={s.returnBannerTitle}>Need to return an item?</h3>
+                <p style={s.returnBannerText}>
+                  {user
+                    ? 'You can initiate a return within 30 days of completion. Returns are processed at your pickup store.'
+                    : 'Log in to your account to initiate a return within 30 days of completion.'}
+                </p>
+              </div>
+            </div>
+            {user ? (
+              <Link to={`/returns/${orderId}`} style={s.returnBannerBtn}>
+                <FiRotateCcw size={14} /> Return
+              </Link>
+            ) : (
+              <Link to="/login" style={s.returnBannerBtn}>
+                Log In to Return
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Actions */}
         <div style={s.actions}>
-          {guestEmail ? (
+          {!user && guestEmail ? (
             <Link to="/track-order" style={s.primaryBtn}>Track Your Order <FiArrowRight size={14} /></Link>
           ) : (
             <Link to={`/orders/${orderId}`} style={s.primaryBtn}>View Order Details <FiArrowRight size={14} /></Link>
+          )}
+          {canReturn && !isReturnStatus && user && (
+            <Link to={`/returns/${orderId}`} style={s.returnActionBtn}>
+              <FiRotateCcw size={14} /> Return
+            </Link>
+          )}
+          {canReturn && !isReturnStatus && !user && (
+            <Link to="/login" style={s.returnActionBtn}>
+              Log In to Return
+            </Link>
           )}
           <Link to="/" style={s.secondaryBtn}>Continue Shopping</Link>
         </div>
@@ -407,6 +509,13 @@ const s = {
   otpSubtext: { fontSize: 13, color: '#8E8E92', lineHeight: 1.5 },
   otpDisplay: { display: 'flex', gap: 12, justifyContent: 'center', marginBottom: 14 },
   otpDigit: { width: 56, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 800, color: '#E8E8E8', backgroundColor: '#141417', borderRadius: 10, border: '1px solid rgba(196,181,253,0.2)', letterSpacing: 2 },
+
+  returnBanner: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: '20px 24px', backgroundColor: '#1b1b1f', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 28, boxShadow: '0 1px 2px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.12)', flexWrap: 'wrap' },
+  returnBannerContent: { display: 'flex', alignItems: 'flex-start', gap: 14, flex: 1 },
+  returnBannerTitle: { fontSize: 15, fontWeight: 700, color: '#E8E8E8', marginBottom: 4 },
+  returnBannerText: { fontSize: 13, color: '#8E8E92', lineHeight: 1.5, margin: 0 },
+  returnBannerBtn: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', backgroundColor: 'rgba(255,255,255,0.08)', color: '#E8E8E8', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', whiteSpace: 'nowrap', transition: 'background-color 220ms ease' },
+  returnActionBtn: { display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', borderRadius: 8, fontWeight: 700, fontSize: 14, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.12)', color: '#E8E8E8', transition: 'border-color 220ms ease' },
 };
 
 export default OrderConfirmationPage;

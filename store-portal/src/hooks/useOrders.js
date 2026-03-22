@@ -14,7 +14,7 @@ export default function useOrders(status = '', page = 1, limit = 20) {
       setError(null);
     }
     try {
-      const data = await orderService.getOrders(status, page, limit);
+      const data = await orderService.getOrders(status, page, limit, { allStores: true });
       if (mountedRef.current) {
         setOrders(data.orders || []);
         setTotalPages(data.pagination?.pages || data.totalPages || Math.ceil((data.pagination?.total || data.total || 0) / limit));

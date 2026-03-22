@@ -10,7 +10,7 @@ export default function useReturns(status = '') {
     setLoading(true);
     setError(null);
     try {
-      const data = await returnService.getReturns(status);
+      const data = await returnService.getReturns(status, { allStores: true });
       setReturns(data.returns || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch returns');

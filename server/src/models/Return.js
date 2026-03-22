@@ -3,8 +3,12 @@ const mongoose = require('mongoose');
 const RETURN_STATUSES = [
   'RETURN_REQUESTED',
   'RETURN_ACCEPTED',
+  'RETURN_VERIFICATION_PENDING',
+  'RETURN_VERIFIED_PASS',
+  'RETURN_VERIFIED_FAIL',
   'RETURN_COMPLETED',
   'RETURN_REJECTED',
+  'RETURN_CANCELLED',
 ];
 
 const returnSchema = new mongoose.Schema(
