@@ -82,8 +82,15 @@ const HomePage = () => {
   );
 };
 
+const CAT_GRID_CSS = `
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:960px){.cat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.cat-grid{grid-template-columns:1fr}}
+`;
+
 const HeroWithCategories = () => (
   <section style={heroStyles.hero}>
+    <style>{CAT_GRID_CSS}</style>
     <div style={heroStyles.overlay} />
     <div style={heroStyles.heroInner}>
       <div style={heroStyles.content}>
@@ -101,7 +108,7 @@ const HeroWithCategories = () => (
       </div>
       <div style={heroStyles.catArea}>
         <h2 style={heroStyles.catHeading}>Shop By Category</h2>
-        <div style={heroStyles.catGrid}>
+        <div className="cat-grid">
           {CATEGORIES.map((cat) => (
             <CategoryTile key={cat.param} {...cat} />
           ))}
@@ -178,11 +185,11 @@ const CategoryTile = ({ label, sub, param, bg, accent, icon }) => (
     whileFocus={{ y: -3 }}
     transition={{ duration: 0.22, ease: 'easeOut' }}
     tabIndex={0}
-    style={{ outline: 'none' }}
+    style={{ outline: 'none', height: '100%' }}
   >
     <Link
       to={`/products?category=${param}`}
-      style={{ ...catStyles.tile, background: bg }}
+      style={{ ...catStyles.tile, background: bg, height: '100%' }}
     >
       <span style={{ ...catStyles.tileIcon, color: accent }}>{icon}</span>
       <span style={catStyles.tileLabel}>{label}</span>
@@ -364,11 +371,7 @@ const heroStyles = {
     textTransform: 'uppercase',
     marginBottom: 22,
   },
-  catGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: 16,
-  },
+  catGrid: {},
   tag: {
     fontSize: 12,
     fontWeight: 700,
