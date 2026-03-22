@@ -38,10 +38,10 @@ const createOrder = async (req, res, next) => {
 
     const orderData = { customerId, deliveryMethod, storeId, items, shippingAddress, guestInfo };
     const order = await orderService.createOrder(orderData);
-    if (order.storeId) {
-      await notificationService.notifyStoreNewOrder(order.storeId, order);
-    }
     res.status(201).json({ order });
+    if (order.storeId) {
+      notificationService.notifyStoreNewOrder(order.storeId, order).catch(() => {});
+    }
   } catch (error) {
     next(error);
   }

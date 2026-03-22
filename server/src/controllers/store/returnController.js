@@ -29,8 +29,8 @@ const acceptReturn = async (req, res, next) => {
       null,
       req.storeUser._id
     );
-    await notificationService.notifyCustomerReturnUpdate(returnRecord.customerId, returnRecord);
     res.status(200).json(returnRecord);
+    notificationService.notifyCustomerReturnUpdate(returnRecord.customerId, returnRecord).catch(() => {});
   } catch (error) {
     next(error);
   }
@@ -43,8 +43,8 @@ const completeReturn = async (req, res, next) => {
       null,
       req.storeUser._id
     );
-    await notificationService.notifyCustomerReturnUpdate(returnRecord.customerId, returnRecord);
     res.status(200).json(returnRecord);
+    notificationService.notifyCustomerReturnUpdate(returnRecord.customerId, returnRecord).catch(() => {});
   } catch (error) {
     next(error);
   }

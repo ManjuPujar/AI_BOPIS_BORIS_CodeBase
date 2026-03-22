@@ -39,70 +39,96 @@ export default function ReturnDetailPage() {
   const fetchReturn = useCallback(async () => {
     try {
       const data = await returnService.getReturnById(returnId);
-      setRet(data.return || data);
+      const fresh = data?.return || data;
+      if (fresh && fresh._id) setRet(fresh);
     } catch {
-      toast.error('Failed to load return details');
-      navigate('/returns');
+      if (loading) {
+        toast.error('Failed to load return details');
+        navigate('/returns');
+      }
     } finally {
       setLoading(false);
     }
-  }, [returnId, navigate]);
+  }, [returnId, navigate, loading]);
 
-  useEffect(() => { fetchReturn(); }, [fetchReturn]);
+  useEffect(() => { fetchReturn(); }, [returnId]);
 
-  const afterAction = async (msg) => {
+  const applyStatus = useCallback((newStatus, msg) => {
+    setRet((prev) => {
+      if (!prev) return prev;
+      return { ...prev, status: newStatus };
+    });
+    setActionLoading(false);
     toast.success(msg);
-    await fetchReturn();
     window.dispatchEvent(new Event('order-action'));
-  };
+    setTimeout(async () => {
+      try {
+        const data = await returnService.getReturnById(returnId);
+        const fresh = data?.return || data;
+        if (fresh && fresh._id) setRet(fresh);
+      } catch { /* silent background refresh */ }
+    }, 800);
+  }, [returnId]);
 
   const handleAccept = async () => {
     setActionLoading(true);
     try {
-      await returnService.acceptReturn(returnId);
-      await afterAction('Return accepted. Customer will be notified to bring items to store.');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setActionLoading(false); }
+      const result = await returnService.acceptReturn(returnId);
+      applyStatus(result?.status || 'RETURN_ACCEPTED', 'Return accepted. Customer will be notified to bring items to store.');
+    } catch (err) {
+      setActionLoading(false);
+      toast.error(err.response?.data?.message || 'Failed to accept return');
+    }
   };
 
   const handleVerify = async (passed) => {
     setActionLoading(true);
     try {
-      await returnService.verifyReturn(returnId, passed);
-      await afterAction(passed ? 'Product verified — passed inspection. You can now complete the return.' : 'Product verification failed.');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setActionLoading(false); }
+      const result = await returnService.verifyReturn(returnId, passed);
+      const expectedStatus = passed ? 'RETURN_VERIFIED_PASS' : 'RETURN_VERIFIED_FAIL';
+      const msg = passed ? 'Product verified — passed inspection. You can now complete the return.' : 'Product verification failed.';
+      applyStatus(result?.status || expectedStatus, msg);
+    } catch (err) {
+      setActionLoading(false);
+      toast.error(err.response?.data?.message || 'Verification failed');
+    }
   };
 
   const handleComplete = async () => {
     setActionLoading(true);
     try {
-      await returnService.completeReturn(returnId);
-      await afterAction('Return completed. Refund will be processed.');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setActionLoading(false); }
+      const result = await returnService.completeReturn(returnId);
+      applyStatus(result?.status || 'RETURN_COMPLETED', 'Return completed. Refund will be processed.');
+    } catch (err) {
+      setActionLoading(false);
+      toast.error(err.response?.data?.message || 'Failed to complete return');
+    }
   };
 
   const handleReject = async () => {
     setActionLoading(true);
     try {
-      await returnService.rejectReturn(returnId, rejectReason);
+      const result = await returnService.rejectReturn(returnId, rejectReason);
       setShowRejectModal(false);
       setRejectReason('');
-      await afterAction('Return rejected. Customer notified.');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setActionLoading(false); }
+      applyStatus(result?.status || 'RETURN_REJECTED', 'Return rejected. Customer notified.');
+    } catch (err) {
+      setActionLoading(false);
+      toast.error(err.response?.data?.message || 'Failed to reject return');
+    }
   };
 
   const handleCancel = async () => {
     setActionLoading(true);
     try {
-      await returnService.cancelReturn(returnId, cancelReason);
+      const result = await returnService.cancelReturn(returnId, cancelReason);
       setShowCancelModal(false);
       setCancelReason('');
-      await afterAction('Return cancelled.');
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setActionLoading(false); }
+      applyStatus(result?.status || 'RETURN_CANCELLED', 'Return cancelled.');
+    } catch (err) {
+      setActionLoading(false);
+      toast.error(err.response?.data?.message || 'Failed to cancel return');
+    }
   };
 
   if (loading) return <Loader />;

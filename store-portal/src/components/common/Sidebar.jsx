@@ -4,7 +4,7 @@ import { FiGrid, FiShoppingBag, FiRotateCcw, FiPackage, FiLogOut, FiDollarSign }
 import useAuth from '../../hooks/useAuth';
 import orderService from '../../services/orderService';
 
-const POLL_INTERVAL = 15000;
+const POLL_INTERVAL = 5000;
 
 const styles = {
   sidebar: {

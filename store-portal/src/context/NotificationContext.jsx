@@ -6,7 +6,7 @@ import useAuth from '../hooks/useAuth';
 
 export const NotificationContext = createContext(null);
 
-const POLL_INTERVAL = 8000;
+const POLL_INTERVAL = 5000;
 
 function requestBrowserNotificationPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
@@ -87,7 +87,7 @@ export function NotificationProvider({ children }) {
   const fireOrderNotification = useCallback((title, msg) => {
     addNotification({ type: 'NEW_ORDER', title, message: msg });
     toast.info(`🔔 ${msg}`, {
-      autoClose: 8000,
+      autoClose: 3000,
       position: 'top-center',
       onClick: () => { window.location.href = '/orders?status=AWAITING_STORE_ACCEPTANCE'; },
       style: { cursor: 'pointer', fontWeight: 600 },
@@ -129,12 +129,12 @@ export function NotificationProvider({ children }) {
         if (isFirstReturnPoll && returnCount > 0) {
           const msg = `${returnCount} return request${returnCount > 1 ? 's' : ''} pending review`;
           addNotification({ type: 'NEW_RETURN', title: 'Pending Returns', message: msg });
-          toast.info(`🔔 ${msg}`, { autoClose: 8000, position: 'top-center' });
+          toast.info(`🔔 ${msg}`, { autoClose: 3000, position: 'top-center' });
         } else if (hasNewReturns) {
           const newReturns = returnCount - previousReturnCountRef.current;
           const msg = `${newReturns} new return request${newReturns > 1 ? 's' : ''}`;
           addNotification({ type: 'NEW_RETURN', title: 'New Return Request', message: msg });
-          toast.info(`🔔 ${msg}`, { autoClose: 8000, position: 'top-center' });
+          toast.info(`🔔 ${msg}`, { autoClose: 3000, position: 'top-center' });
         }
         previousReturnCountRef.current = returnCount;
       }

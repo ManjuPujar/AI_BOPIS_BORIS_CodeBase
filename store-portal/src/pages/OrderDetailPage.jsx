@@ -65,9 +65,10 @@ export default function OrderDetailPage() {
     }
   };
 
-  const applyStatusAndRefetch = async (newStatus) => {
+  const applyStatusAndRefetch = (newStatus) => {
     setOrder((prev) => prev ? { ...prev, status: newStatus } : prev);
-    await refetchOrder();
+    window.dispatchEvent(new Event('order-action'));
+    setTimeout(() => refetchOrder(), 600);
   };
 
   const handleAccept = async () => {

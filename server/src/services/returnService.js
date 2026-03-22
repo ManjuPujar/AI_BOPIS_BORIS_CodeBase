@@ -212,7 +212,7 @@ const completeReturn = async (returnId, storeId, storeUserId) => {
     quantity: item.quantity,
   }));
 
-  await inventoryService.restoreStoreInventory(storeId, inventoryItems);
+  await inventoryService.restoreStoreInventory(returnDoc.storeId || storeId, inventoryItems);
 
   const refundAmount = returnItems.reduce(
     (sum, item) => sum + item.unitPrice * item.quantity,
